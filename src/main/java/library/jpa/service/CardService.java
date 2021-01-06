@@ -1,22 +1,21 @@
 package library.jpa.service;
 
+import com.google.common.base.Strings;
 import io.jsonwebtoken.Jwts;
-import library.exception.exception.ApiRequestException;
-import library.exception.exception.EmptyException;
-import library.exception.exception.ExistNullOrBorrowedBookException;
-import library.exception.exception.NullException;
-import library.jpa.DAO.ListDao;
-import library.jpa.DAO.PayBookDAO;
+import library.exception.exception.*;
+import library.jpa.Dao.EditCardFormDao;
+import library.jpa.Dao.ListDao;
 import library.jpa.entity.Book;
 import library.jpa.entity.Card;
-import library.jpa.entity.HeadBook;
 import library.jpa.entity.Session;
-import library.jpa.enum_.StatusCard;
-import library.jpa.enum_.StatusSession;
+import library.jpa.enums.StatusCard;
 import library.jpa.repository.CardRepository;
+import library.security.Dao.FormAdminEdit;
+import library.security.Dao.InformationUserDaoResponse;
 import library.security.configuration.jwt_config.JwtPropertiesConfiguration;
 import library.userdetailservice.model.Account;
 import library.userdetailservice.repository.AccountRepository;
+import org.apache.catalina.mapper.Mapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.crypto.SecretKey;
 import javax.servlet.http.HttpServletRequest;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import static library.jpa.enum_.StatusBook.*;
-import static library.jpa.enum_.StatusSession.*;
+import static library.jpa.enums.StatusBook.*;
+import static library.jpa.enums.StatusSession.*;
 
 @Service
 @Transactional
@@ -69,26 +66,25 @@ public class CardService {
         return repositoryCard.findAll();
     }
 
-    public Account getAccount(HttpServletRequest httpServletRequest) {
-        String token = httpServletRequest.getHeader("Authorization").replace(jwtPropertiesConfiguration.getTokenPrefix(), "");
-
-        String username = Jwts.parser()
-                .setSigningKey(secretKey)
-                .parseClaimsJws(token).getBody().getSubject();
-
-        return accountRepository.findByUsername(username);
-    }
-
     // *** good ***
     public void orderBooks(ListDao borrowBookDAO, HttpServletRequest httpServletRequest) {
         // get card ID in token from http request
         Account account = getAccount(httpServletRequest);
 
+        // check punish
+        Card card = account.getCardInformation();
+        if (card.getStatus().equals(StatusCard.INACTIVE.getStatus())) {
+            throw new ApiRequestException("Your Card is inactive. You can't order Book");
+        } else if (card.getStatus().equals(StatusCard.PENALTY.getStatus())
+                && card.getList_Sessions().size() >= 5) {
+            throw new ApiRequestException("Your Card is penalty. You can't borrowed over 5 book");
+        }
+
         // exception handle
         if (borrowBookDAO.getListId() == null) {
             throw new NullException("List book Id is null. Enter 'listId' of book");
         }
-        if (borrowBookDAO.getListId().size() == 0) {
+        if (borrowBookDAO.getListId().isEmpty()) {
             throw new EmptyException("List book is empty. Enter book ID to borrow book");
         }
 
@@ -105,9 +101,9 @@ public class CardService {
                 listNullID.add(id);
             }
             // ID book is borrowed add to borrowed list
-            else if (bookService.getById(id).getStatus().equals(BORROWED.getStatus())) {
+            else if (bookService.getBookById(id).getStatus().equals(BORROWED.getStatus())) {
                 listBorrowedId.add(id);
-            } else if (bookService.getById(id).getStatus().equals(ORDERED.getStatus())) {
+            } else if (bookService.getBookById(id).getStatus().equals(ORDERED.getStatus())) {
                 listOrdered.add(id);
             }
             // else add to list book
@@ -118,30 +114,13 @@ public class CardService {
 
         // return library if has book is borrowed or null and user want return when has any book cant borrowed
         if (!listBorrowedId.isEmpty() || !listNullID.isEmpty() || !listOrdered.isEmpty()) {
-            StringBuilder listIDNull = new StringBuilder("Null ID: ");
-            for (Long id : listNullID) {
-                listIDNull.append(" '").append(id.toString()).append("', ");
-            }
-            StringBuilder listIDBorrowed = new StringBuilder("Borrowed ID: ");
-            for (Long id : listBorrowedId) {
-                listIDBorrowed.append(" '").append(id.toString()).append("', ");
-            }
-            StringBuilder listIDOrdered = new StringBuilder("Ordered ID: ");
-            for (Long id : listOrdered) {
-                listIDOrdered.append(" '").append(id.toString()).append("', ");
-            }
-            StringBuilder listCanBorrowed = new StringBuilder("ID can borrowed: ");
-            for (Long id : listIdBook) {
-                listCanBorrowed.append(" '").append(id.toString()).append("', ");
-            }
+            Map<String,List<Long>> map = new HashMap<>();
+            map.put("List ID Null",listNullID);
+            map.put("List ID Borrowed",listBorrowedId);
+            map.put("List ID is Ordered",listOrdered);
+            map.put("List ID you can order",listIdBook);
 
-            String[] data = new String[4];
-            data[0] = listIDNull.toString();
-            data[1] = listIDBorrowed.toString();
-            data[2] = listIDOrdered.toString();
-            data[3] = listCanBorrowed.toString();
-
-            throw new ExistNullOrBorrowedBookException("Order unsuccessful. Enter correct your Id", data);
+            throw new ExistNullOrBorrowedBookException("Order unsuccessful. Enter correct your Id", map);
         }
 
         // empty list
@@ -164,8 +143,6 @@ public class CardService {
 
     // *** good ***
     public void orderBookByHead(ListDao listdao, HttpServletRequest httpServletRequest) {
-        Account account = getAccount(httpServletRequest);
-
         // exception handle
         if (listdao.getListId() == null) {
             throw new NullException("List book Id is null. Enter 'listId' of book");
@@ -186,7 +163,7 @@ public class CardService {
             List<Book> list = new ArrayList<>();
 
             if (!headBookService.isNotExist(id))
-                list = bookService.findByHeadBookId(id, NORMAL.getStatus());
+                list = bookService.findByIdAndStatus(id, NORMAL.getStatus());
 
             if (headBookService.isNotExist(id))
                 listNullId.add(id);
@@ -201,28 +178,43 @@ public class CardService {
 
         // return library if has book is borrowed or null and user want return when has any book cant borrowed
         if (!listIdCantOrder.isEmpty() || !listNullId.isEmpty()) {
-            StringBuilder listIDNull = new StringBuilder("Head Book ID Null: ");
-            for (Long id : listNullId) {
-                listIDNull.append(" '").append(id.toString()).append("', ");
-            }
-            StringBuilder listIDCantOrder = new StringBuilder("ID head book cant order because empty: ");
-            for (Long id : listIdCantOrder) {
-                listIDCantOrder.append(" '").append(id.toString()).append("', ");
-            }
-            StringBuilder listIDCanOrder = new StringBuilder("ID head book you can order: ");
-            for (Long id : listIdCanOrder) {
-                listIDCanOrder.append(" '").append(id.toString()).append("', ");
-            }
+            Map<String,List<Long>> map = new HashMap<>();
+            map.put("List Id null",listNullId);
+            map.put("List Id can't",listIdCantOrder);
+            map.put("List Id you can order",listIdCanOrder);
 
-            String[] data = new String[3];
-            data[0] = listIDNull.toString();
-            data[1] = listIDCantOrder.toString();
-            data[2] = listIDCanOrder.toString();
-
-            throw new ExistNullOrBorrowedBookException("Order unsuccessful. Enter correct your Id", data);
+            throw new ExistNullOrBorrowedBookException("Order unsuccessful. Enter correct your Id", map);
         }
 
         orderBooks(new ListDao(listIdBooks), httpServletRequest);
+    }
+
+    // *** ok ***
+    public InformationUserDaoResponse createCard(FormAdminEdit formAdminEdit) {
+        preExceptionIdOrUsername(formAdminEdit.getUsername(), formAdminEdit.getIdAccount());
+
+        // get account switch username or id from request
+        Account account = getAccountByIdOrUsername(formAdminEdit.getUsername(), formAdminEdit.getIdAccount());
+
+        // set status card of user is miss
+        Card cardMiss = getByID(account.getIdCard());
+        cardMiss.setStatus(StatusCard.MISS.getStatus());
+        updateById(cardMiss);
+
+        // create new card
+        Card card = createNewCard();
+        card.setId_account(account.getId());
+
+        // set ID Role account to change
+        account.setIdCard(card.getId());
+
+        // set role to account to response to client
+        account.setCardInformation(card);
+
+        // save account to database
+        accountRepository.save(account);
+
+        return new InformationUserDaoResponse(account);
     }
 
     public void moreTime(ListDao listDao, HttpServletRequest httpServletRequest) {
@@ -252,8 +244,8 @@ public class CardService {
 
             String status = "";
 
-            if (bookService.getById(id) != null) {
-                Session session = bookService.getById(id).getSession();
+            if (bookService.getBookById(id) != null) {
+                Session session = bookService.getBookById(id).getSession();
                 if (session != null) {
                     status = session.getStatus();
                 }
@@ -301,6 +293,13 @@ public class CardService {
 
         for (Long id : listIdCanOrder) {
             Session session = bookService.getBookById(id).getSession();
+            if (!session.getStatus().equals(EXPIRECOMMING.name())) {
+                throw new ApiRequestException("not expired date coming");
+            }
+        }
+
+        for (Long id : listIdCanOrder) {
+            Session session = bookService.getBookById(id).getSession();
             session.setStatus(MORETIMEORDER.name());
         }
 
@@ -318,9 +317,9 @@ public class CardService {
 
         // card id, list book id not null and list book not empty
         if (payBookDAO.getListId() == null) {
-            throw new NullException("List book ID is null. Enter attribute 'listIdBooks' and put your id you want return");
+            throw new NullException("List book ID is null. Enter attribute 'listId' and put your id you want return");
         }
-        if (payBookDAO.getListId().size() == 0) {
+        if (payBookDAO.getListId().isEmpty()) {
             throw new EmptyException("List book ID is empty. Enter book ID to return book");
         }
 
@@ -349,16 +348,11 @@ public class CardService {
 
         // exception empty
         if (listPayBook.isEmpty())
-            throw new EmptyException("List book return to library is empty in your List ID you just enter.");
-
-        // set status book back to normal
-        for (Long id : listPayBook) {
-            bookService.getBookById(id).setStatus(NORMAL.getStatus());
-        }
+            throw new EmptyException("List book return to library is empty in your List ID you just enter. Check your ID return !");
 
         for (Session session : listSession) {
             if (listPayBook.contains(session.getIdBook())) {
-                sessionService.delete(session.getId());
+                sessionService.getbyID(session.getId()).setStatus(GIVEBACK.name());
             }
         }
 
@@ -367,21 +361,6 @@ public class CardService {
 
     public boolean isExist(Long id) {
         return repositoryCard.existsById(id);
-    }
-
-
-    // *** good ***
-    public Card createNewCard(HttpServletRequest httpServletRequest) {
-        String username = getUsernameFromRequest(httpServletRequest);
-
-        Account account = accountRepository.findByUsername(username);
-
-        Card card = createNewCard();
-        card.setId_account(account.getId());
-        account.setIdCard(card.getId());
-
-        accountRepository.save(account);
-        return card;
     }
 
     public Card createNewCard() {
@@ -393,11 +372,43 @@ public class CardService {
         return card;
     }
 
-    public void update(Card card) {
+    public List<Card> managerEdit(EditCardFormDao editCardFormDao) {
+        // exception handle
+        if (editCardFormDao.getListId() == null) {
+            throw new NullException("List Card Id is null. Enter 'listId' of Card");
+        }
+        if (editCardFormDao.getListId().size() == 0) {
+            throw new EmptyException("List ID is empty. Enter book ID to borrow Card");
+        }
+        if (Strings.isNullOrEmpty(editCardFormDao.getStatus())) {
+            throw new EmptyException("Status is null or empty. enter 'status' attribute");
+        }
+
+        for (Long id : editCardFormDao.getListId()) {
+            if (!repositoryCard.existsById(id)) {
+                throw new ExistException("id '" + id + "' of card ís not exist");
+            }
+        }
+
+        if (!StatusCard.isDefine(editCardFormDao.getStatus())) {
+            throw new ApiRequestException("status '" + editCardFormDao.getStatus() + "' not defined", StatusCard.getStatusString());
+        }
+
+        List<Card> cardList = new ArrayList<Card>();
+
+        for (Long id : editCardFormDao.getListId()) {
+            Card card = repositoryCard.getOne(id);
+            card.setStatus(editCardFormDao.getStatus());
+            cardList.add(card);
+        }
+        return cardList;
+    }
+
+    public void updateById(Card card) {
         repositoryCard.save(card);
     }
 
-    public Card update(Card cardLibrary, Long id) {
+    public Card updateById(Card cardLibrary, Long id) {
         if (!isExist(id)) {
             throw new ApiRequestException("this id is not exist");
         }
@@ -410,17 +421,16 @@ public class CardService {
 
     public void back(Long id) {
         Session session = sessionService.getbyID(id);
-        session.setStatus("da tra");
-        sessionService.update(session, id);
 
-        Book book = bookService.getById(session.getIdBook());
-        book.setStatus("binh thuong");
-//        bookService.updateBook(book);
+        Book book = bookService.getBookById(session.getIdBook());
+        book.setStatus(NORMAL.getStatus());
+
+        sessionService.delete(id);
     }
 
     public void delete(long id) {
         if (!isExist(id)) {
-            throw new ApiRequestException("this id is not exist");
+            throw new ExistException("this id '" + id + "' is not exist");
         }
         repositoryCard.deleteById(id);
     }
@@ -428,12 +438,36 @@ public class CardService {
     // *** good ***
     public String getUsernameFromRequest(HttpServletRequest httpServletRequest) {
         String token = httpServletRequest.getHeader("Authorization").replace(jwtPropertiesConfiguration.getTokenPrefix(), "");
+        return Jwts.parser()
+                .setSigningKey(secretKey)
+                .parseClaimsJws(token).getBody().getSubject();
+    }
+
+    public void preExceptionIdOrUsername(String username, Long id) {
+        if (username == null && id == null)
+            throw new NullException("account ID and Username is null. Enter 'idAccount' or 'username' to request.");
+        if (!accountRepository.existsByUsername(username) && username != null)
+            throw new ExistException("This Username '" + username + "' is not existed");
+        if (id != null && !accountRepository.existsById(id))
+            throw new ExistException("This User ID '" + id + "' is not existed");
+    }
+
+    public Account getAccountByIdOrUsername(String username, Long id) {
+        if (username != null) {
+            return accountRepository.findByUsername(username);
+        } else {
+            return accountRepository.getOne(id);
+        }
+    }
+
+    public Account getAccount(HttpServletRequest httpServletRequest) {
+        String token = httpServletRequest.getHeader("Authorization").replace(jwtPropertiesConfiguration.getTokenPrefix(), "");
 
         String username = Jwts.parser()
                 .setSigningKey(secretKey)
                 .parseClaimsJws(token).getBody().getSubject();
 
-        return username;
+        return accountRepository.findByUsername(username);
     }
 }
 

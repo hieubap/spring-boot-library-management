@@ -2,7 +2,7 @@ package library.jpa.entity;//package com.example.final_library.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import library.jpa.DAO.HeadBookDao;
+import library.jpa.Dao.HeadBookDao;
 
 import javax.persistence.*;
 import java.util.Collection;
@@ -26,6 +26,11 @@ public class HeadBook {
     private Collection<Book> books;
 
     public HeadBook() {
+    }
+
+    public HeadBook(String name, String publisher) {
+        this.name = name;
+        this.publisher = publisher;
     }
 
     public void setHeadBook(HeadBook headBook){

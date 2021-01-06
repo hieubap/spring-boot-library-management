@@ -1,9 +1,7 @@
 package library.userdetailservice.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import library.jpa.entity.Card;
-import library.jpa.entity.User;
 
 import javax.persistence.*;
 
@@ -26,7 +24,7 @@ public class Account {
 
 	@OneToOne
 	@JoinColumn(name = "id_user",insertable = false,updatable = false)
-	private User userInformation;
+	private Information userInformation;
 
 	@ManyToOne
 	@JoinColumn(name = "id_role",updatable = false,insertable = false)
@@ -94,11 +92,11 @@ public class Account {
 	}
 
 	@JsonManagedReference
-	public User getUserInformation() {
+	public Information getUserInformation() {
 		return userInformation;
 	}
 
-	public void setUserInformation(User userInformation) {
+	public void setUserInformation(Information userInformation) {
 		this.userInformation = userInformation;
 	}
 

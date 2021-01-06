@@ -1,7 +1,7 @@
 package library.jpa.exportExcel;
 
 import library.jpa.entity.Book;
-import library.jpa.entity.User;
+import library.userdetailservice.model.Information;
 import org.apache.poi.hssf.usermodel.HSSFCellStyle;
 import org.apache.poi.hssf.usermodel.HSSFFont;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
@@ -23,7 +23,7 @@ public class ExcelHandle {
         style.setFont(font);
         return style;
     }
-    public static void excelTest(List<User> list) throws IOException {
+    public static void excelTest(List<Information> list) throws IOException {
         HSSFWorkbook workbook = new HSSFWorkbook();
         HSSFSheet sheet = workbook.createSheet("Book");
 
@@ -49,7 +49,7 @@ public class ExcelHandle {
         cell.setCellStyle(style);
 
         // Data
-        for (User emp : list) {
+        for (Information emp : list) {
             rownum++;
             row = sheet.createRow(rownum);
 

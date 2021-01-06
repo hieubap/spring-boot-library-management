@@ -4,20 +4,20 @@ import io.jsonwebtoken.Jwts;
 import library.exception.exception.ExistException;
 import library.exception.exception.NullException;
 import library.jpa.entity.Card;
-import library.jpa.entity.User;
-import library.jpa.enum_.StatusCard;
-import library.jpa.repository.UserRepository;
+import library.userdetailservice.model.Information;
+import library.jpa.repository.InformationRepository;
 import library.jpa.service.CardService;
-import library.security.DAO.FormAdminEdit;
-import library.security.DAO.FormEditUser;
-import library.security.DAO.FormRegister;
-import library.security.DAO.InformationUserDao;
+import library.security.Dao.FormAdminEdit;
+import library.security.Dao.FormEditUser;
+import library.security.Dao.FormRegister;
+import library.security.Dao.InformationUserDaoResponse;
 import library.security.configuration.jwt_config.JwtPropertiesConfiguration;
 import library.userdetailservice.model.Account;
 import library.userdetailservice.model.Authority;
 import library.userdetailservice.model.Role;
-import library.userdetailservice.repository.RoleRepository;
 import library.userdetailservice.repository.AccountRepository;
+import library.userdetailservice.repository.RoleRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -32,16 +32,17 @@ import java.util.List;
 public class UserDetailServiceAlter implements UserDetailsService {
     private final AccountRepository accountRepository;
     private final CardService cardService;
-    private final UserRepository userRepository;
+    private final InformationRepository informationRepository;
     private final RoleRepository roleRepository;
     private final SecretKey secretKey;
     private final JwtPropertiesConfiguration jwtPropertiesConfiguration;
     private final PasswordEncoder passwordEncoder;
 
-    public UserDetailServiceAlter(AccountRepository userRepository, CardService cardRepository, UserRepository userRepository1, RoleRepository roleRepository, SecretKey secretKey, JwtPropertiesConfiguration jwtPropertiesConfiguration, PasswordEncoder passwordEncoder) {
+    @Autowired
+    public UserDetailServiceAlter(AccountRepository userRepository, CardService cardRepository, InformationRepository userRepository1, RoleRepository roleRepository, SecretKey secretKey, JwtPropertiesConfiguration jwtPropertiesConfiguration, PasswordEncoder passwordEncoder) {
         this.accountRepository = userRepository;
         this.cardService = cardRepository;
-        this.userRepository = userRepository1;
+        this.informationRepository = userRepository1;
         this.roleRepository = roleRepository;
         this.secretKey = secretKey;
         this.jwtPropertiesConfiguration = jwtPropertiesConfiguration;
@@ -57,17 +58,17 @@ public class UserDetailServiceAlter implements UserDetailsService {
     }
 
     // *** good ***
-    public InformationUserDao getProfile(HttpServletRequest httpServletRequest) {
+    public InformationUserDaoResponse getProfile(HttpServletRequest httpServletRequest) {
         // get username
         String username = getUsernameFromRequest(httpServletRequest);
 
         // get account with username
         Account account = accountRepository.findByUsername(username);
-        return new InformationUserDao(account);
+        return new InformationUserDaoResponse(account);
     }
 
     // *** good ***
-    public InformationUserDao editProfile(HttpServletRequest httpServletRequest, FormEditUser dao) {
+    public InformationUserDaoResponse editProfile(HttpServletRequest httpServletRequest, FormEditUser dao) {
         // get username from http servlet request
         String username = getUsernameFromRequest(httpServletRequest);
 
@@ -75,24 +76,24 @@ public class UserDetailServiceAlter implements UserDetailsService {
         Account account = accountRepository.findByUsername(username);
 
         // user is entity save information of account so edit user
-        User user = userRepository.getOne(account.getIdUser());
+        Information user = informationRepository.getOne(account.getIdUser());
         user.setInformation(dao);
-        userRepository.save(user);
+        informationRepository.save(user);
 
         // create Information response
 
-        return new InformationUserDao(account);
+        return new InformationUserDaoResponse(account);
     }
 
     // *** good ***
-    public InformationUserDao createNewAccount(FormRegister userDao) {
+    public InformationUserDaoResponse createNewAccount(FormRegister userDao) {
         // if username is exist throw exception
         if (accountRepository.existsByUsername(userDao.getUsername()))
             throw new ExistException("This Username '" + userDao.getUsername() + "' is existed");
 
-        // create information with empty for account
-        User user = new User(userDao);
-        userRepository.save(user);
+        // create information with empty for account, create card and role
+        Information user = new Information(userDao);
+        informationRepository.save(user);
         Role role = roleRepository.findByName("USER");
         Card card = cardService.createNewCard();
 
@@ -108,11 +109,11 @@ public class UserDetailServiceAlter implements UserDetailsService {
         account.setRoleInformation(role);
         account.setCardInformation(card);
 
-        return new InformationUserDao(account);
+        return new InformationUserDaoResponse(account);
     }
 
     // *** ok ***
-    public InformationUserDao adminSetRole(FormAdminEdit formAdminEdit) {
+    public InformationUserDaoResponse adminSetRole(FormAdminEdit formAdminEdit) {
         preExceptionIdOrUsername(formAdminEdit.getUsername(), formAdminEdit.getIdAccount());
 
         if (formAdminEdit.getIdRole() == null)
@@ -125,41 +126,13 @@ public class UserDetailServiceAlter implements UserDetailsService {
         account.setIdRole(formAdminEdit.getIdRole());
 
         // set role to account to response to client
-        Role role = roleRepository.findById(account.getIdRole()).get();
+        Role role = roleRepository.getOne(account.getIdRole());
         account.setRoleInformation(role);
 
         // save change of account to database
         accountRepository.save(account);
 
-        return new InformationUserDao(account);
-    }
-
-    // *** ok ***
-    public InformationUserDao createCard(FormAdminEdit formAdminEdit) {
-        preExceptionIdOrUsername(formAdminEdit.getUsername(), formAdminEdit.getIdAccount());
-
-        // get account switch username or id from request
-        Account account = getAccountByIdOrUsername(formAdminEdit.getUsername(), formAdminEdit.getIdAccount());
-
-        // set status card of user is miss
-        Card cardMiss = cardService.getByID(account.getIdCard());
-        cardMiss.setStatus(StatusCard.MISS.getStatus());
-        cardService.update(cardMiss);
-
-        // create new card
-        Card card = cardService.createNewCard();
-        card.setId_account(account.getId());
-
-        // set ID Role account to change
-        account.setIdCard(card.getId());
-
-        // set role to account to response to client
-        account.setCardInformation(card);
-
-        // save account to database
-        accountRepository.save(account);
-
-        return new InformationUserDao(account);
+        return new InformationUserDaoResponse(account);
     }
 
 
@@ -211,7 +184,7 @@ public class UserDetailServiceAlter implements UserDetailsService {
         if (username != null) {
             return accountRepository.findByUsername(username);
         } else {
-            return accountRepository.findById(id).get();
+            return accountRepository.getOne(id);
         }
     }
 }

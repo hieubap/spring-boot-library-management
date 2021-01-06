@@ -14,7 +14,7 @@ import java.sql.Timestamp;
 class APIHandleException extends ResponseEntityExceptionHandler {
     @ExceptionHandler(value = {ApiRequestException.class})
     public ResponseEntity<Object> handleException(ApiRequestException e) {
-        return createResEntity(e.getMessage(), 400);
+        return createResEntity(e.getMessage(), 400,e.getData());
     }
 
     @ExceptionHandler(value = {ExistException.class})
@@ -35,6 +35,11 @@ class APIHandleException extends ResponseEntityExceptionHandler {
     @ExceptionHandler(value = {ExistNullOrBorrowedBookException.class})
     public ResponseEntity<Object> handleBookIsBorrowed(ExistNullOrBorrowedBookException e) {
         return createResEntity(e.getMessage(), 400,e.getData());
+    }
+    @ExceptionHandler(ResourceException.class)
+    public ResponseEntity<Object> handleNotFound(ResourceException e) {
+        System.out.println("active");
+        return createResEntity(HttpStatus.resolve(e.getStatus()).getReasonPhrase(), e.getStatus(),null);
     }
 
     public ResponseEntity<Object> createResEntity(String message, int status) {

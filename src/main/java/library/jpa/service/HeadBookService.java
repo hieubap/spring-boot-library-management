@@ -1,9 +1,8 @@
 package library.jpa.service;
 
-import library.exception.exception.EmptyException;
 import library.exception.exception.ExistException;
 import library.exception.exception.NullException;
-import library.jpa.DAO.HeadBookDao;
+import library.jpa.Dao.HeadBookDao;
 import library.jpa.entity.Book;
 import library.jpa.entity.HeadBook;
 import library.jpa.repository.BookRepository;
@@ -15,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.util.List;
 
-import static library.jpa.enum_.StatusBook.NORMAL;
+import static library.jpa.enums.StatusBook.NORMAL;
 
 @Service
 @Transactional
@@ -24,16 +23,23 @@ public class HeadBookService {
     private final BookRepository bookRepository;
 
     @Autowired
-    public HeadBookService(HeadBookRepository headBookRepository, BookRepository bookRepository) {
+    public HeadBookService(HeadBookRepository headBookRepository,
+                           BookRepository bookRepository) {
         this.headBookRepository = headBookRepository;
         this.bookRepository = bookRepository;
     }
 
+//    @HystrixCommand(fallbackMethod = "renderError")
     public List<HeadBook> getAllHeadBook() {
-        if (headBookRepository.count() == 0) {
-            throw new EmptyException("list headBooks is empty");
-        }
-        return headBookRepository.findAll();
+        throw new NullException("null active");
+//        if (headBookRepository.findAll().isEmpty()) {
+//            throw new EmptyException("list headBooks is empty");
+//        }
+//        return headBookRepository.findAll();
+    }
+
+    public void renderError(){
+        System.out.println("error fallback");
     }
 
     public HeadBook getHeadBookById(Long id) {
@@ -43,19 +49,7 @@ public class HeadBookService {
         return headBookRepository.getOne(id);
     }
 
-//    public List<HeadBook> findbyname(String name) {
-//        return headBookRepository.findByNameContains(name);
-//    }
-//
-//    public List<HeadBook> findbyauthor(String name) {
-//        return headBookRepository.findByAuthorContains(name);
-//    }
-//
-//    public List<HeadBook> findbypublish(String name) {
-//        return headBookRepository.findByPublisherContains(name);
-//    }
-
-    public List<HeadBook> find(HeadBookDao headBookDAO) {
+    public List<HeadBook> findByDao(HeadBookDao headBookDAO) {
         headBookDAO.autoSet();
 
         return headBookRepository.findByNameContainsAndPublisherContainsAndAuthorContaining(
@@ -64,20 +58,6 @@ public class HeadBookService {
                 headBookDAO.getAuthor()
         );
     }
-
-
-//    public void addHeadBook(HeadBook headBook) {
-//        if (headBook.getId() == null || headBook.getName() == null ||
-//                headBook.getAuthor() == null || headBook.getPublisher() == null ||
-//                headBook.getPrice() == null || headBook.getNumberOfPages() == null) {
-//            throw new ApiRequestException("id/name/author/publisher/price/numberofpage field of headbook is null");
-//        }
-//        if (isExist(headBook.getId())) {
-//            throw new ExistException("this headbook id " + headBook.getId() + " is not exist");
-//        }
-//
-//        headBookRepository.save(headBook);
-//    }
 
     public void addHeadBook(HeadBookDao headBookdao) {
         if (headBookdao.getNumberBooks() == null || headBookdao.getName() == null ||
@@ -113,7 +93,7 @@ public class HeadBookService {
 
     public void updateHeadBook(HeadBook headBook, Long id) {
         if (isNotExist(id)) {
-            throw new ExistException("this headbook id " + id + " is not exist");
+            throw new ExistException("this headBook id " + id + " is not exist");
         }
         HeadBook headBook1 = headBookRepository.getOne(headBook.getId());
         headBook1.setHeadBook(headBook);
@@ -123,7 +103,7 @@ public class HeadBookService {
 
     public void deleteHeadBookById(Long id) {
         if (isNotExist(id)) {
-            throw new ExistException("this headbook id " + id + " is not exist");
+            throw new ExistException("this headBook id " + id + " is not exist");
         }
         headBookRepository.deleteById(id);
     }

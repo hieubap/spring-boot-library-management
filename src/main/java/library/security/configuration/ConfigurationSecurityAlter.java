@@ -1,8 +1,8 @@
 package library.security.configuration;
 
 import library.security.configuration.jwt_config.JwtPropertiesConfiguration;
-import library.security.filter.JwtTokenVerifierFilter;
 import library.security.filter.JwtUsernamePasswordAuthenticationFilter;
+import library.security.filter.TokenVerifierFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -18,6 +18,7 @@ import javax.crypto.SecretKey;
 @Configuration
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true)
+//@EnableCircuitBreaker
 public class ConfigurationSecurityAlter extends WebSecurityConfigurerAdapter {
     private static final boolean isJwtToken = true;
     private static final boolean isRemember_Me = true;
@@ -32,7 +33,9 @@ public class ConfigurationSecurityAlter extends WebSecurityConfigurerAdapter {
         this.userDetailsService = userDetailsService;
         this.secretKey = secretKey;
         this.jwtConfigProperties = jwtConfigProperties;
+//        System.out.println(":::"+filterChainProxy.getFilterChains().get(0).getFilters().get(0).getClass().getName());
     }
+
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
@@ -48,7 +51,7 @@ public class ConfigurationSecurityAlter extends WebSecurityConfigurerAdapter {
                     .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                     .and()
                     .addFilter(new JwtUsernamePasswordAuthenticationFilter(authenticationManager(), jwtConfigProperties, secretKey))
-                    .addFilterAfter(new JwtTokenVerifierFilter(jwtConfigProperties, secretKey), JwtUsernamePasswordAuthenticationFilter.class);
+                    .addFilterAfter(new TokenVerifierFilter(jwtConfigProperties, secretKey), JwtUsernamePasswordAuthenticationFilter.class);
         }
         if (isForm_Login) {
             http
@@ -70,4 +73,5 @@ public class ConfigurationSecurityAlter extends WebSecurityConfigurerAdapter {
                 .and()
                 .httpBasic();
     }
+
 }

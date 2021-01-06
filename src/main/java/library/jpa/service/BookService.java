@@ -4,6 +4,7 @@ import library.exception.exception.EmptyException;
 import library.exception.exception.ExistException;
 import library.exception.exception.NullException;
 import library.jpa.entity.Book;
+import library.jpa.enums.StatusBook;
 import library.jpa.repository.BookRepository;
 import library.jpa.repository.HeadBookRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,46 +28,41 @@ public class BookService {
     }
 
     public List<Book> getAllBook() {
-        if (bookRepository.count() == 0) {
+        if (bookRepository.findAll().isEmpty()) {
             throw new EmptyException("List book is empty");
         }
         return bookRepository.findAll();
     }
 
-    public Book getById(Long id) {
-        if (isExist(id))
-            return bookRepository.getOne(id);
-        return null;
-    }
-
     public Book getBookById(Long id) {
         if (!isExist(id)) {
-            throw new ExistException("this book id " + id + " is not exist");
+            throw new ExistException("this book id '" + id + "' is not exist");
         }
         return bookRepository.getOne(id);
     }
-    public List<Book> findByHeadBookId(Long id,String status){
-        return bookRepository.findByHeadBookIdAndStatusContains(id,status);
+
+    public List<Book> findByIdAndStatus(Long id, String status) {
+        return bookRepository.findByHeadBookIdAndStatusContains(id, status);
     }
 
     public Book addBook(Book book) {
         if (book.getHeadBook() == null) {
-            throw new NullException("headbookid field of book is not null");
+            throw new NullException("headBookId field of book is not null");
         } else if (book.getHeadBook() != null) {
             headBookRepository.save(book.getHeadBook());
         } else if (isExist(book.getId())) {
             throw new ExistException("The id" + book.getId() + " is exist !");
         } else if (!headBookRepository.existsById(book.getHeadBookId())) {
-            throw new ExistException("this headbook with id = " + book.getHeadBookId() + " is not exist! create headbook");
+            throw new ExistException("this headBook with id = " + book.getHeadBookId() + " is not exist! create headBook");
         }
 
-        book.setStatus("binh thuong");
+        book.setStatus(StatusBook.NORMAL.getStatus());
         book.setAddedDate(new Timestamp(System.currentTimeMillis()));
         bookRepository.save(book);
         return book;
     }
 
-    public Book updateBook(Book book, Long id) {
+    public Book updateBookById(Book book, Long id) {
         if (!isExist(id)) {
             throw new ExistException("this book id " + id + " is not exist");
         }

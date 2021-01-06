@@ -3,11 +3,9 @@ package library.jpa.service;
 
 import library.exception.exception.ApiRequestException;
 import library.exception.exception.NullException;
-import library.jpa.DAO.ListDao;
+import library.jpa.Dao.ListDao;
 import library.jpa.entity.Book;
 import library.jpa.entity.Session;
-import library.jpa.enum_.StatusBook;
-import library.jpa.enum_.StatusSession;
 import library.jpa.repository.BookRepository;
 import library.jpa.repository.CardRepository;
 import library.jpa.repository.SessionRepository;
@@ -20,8 +18,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static library.jpa.enum_.StatusBook.BORROWED;
-import static library.jpa.enum_.StatusSession.*;
+import static library.jpa.enums.StatusBook.*;
+import static library.jpa.enums.StatusSession.*;
 
 @Service
 @Transactional
@@ -94,10 +92,6 @@ public class SessionService {
         sessionRepository.save(session);
     }
 
-//    public boolean isExistByIdBook(Long id){
-//        return sessionRepository.isExistByIdBook(id);
-//    }
-
     public Session update(Session session, Long id) {
         Session session1 = sessionRepository.getOne(id);
         session1.set(session);
@@ -118,17 +112,52 @@ public class SessionService {
             else
                 throw new NullException("Id session '" + id + "' is null. Check your ID Session ");
 
-            if (listDao.getStatus())
-                session.setStatus(APPROVED.name());
-            else
-                session.setStatus(DENY.name());
 
-            // set status book to borrowed if user already want borrowed book
-            bookRepository.getOne(session.getIdBook()).setStatus(BORROWED.getStatus());
+            if (!session.getStatus().equals(GIVEBACK.name())&&!session.getStatus().equals(ORDERED.name())
+                    &&!session.getStatus().equals(MORETIMEORDER.name())) {
+                sessionRepository.deleteById(session.getId());
+                continue;
+            }
+
+            if (listDao.getStatus()) {
+
+                if (session.getStatus().equals(ORDER.name())) {
+                    // set status book to borrowed if user already want borrowed book
+                    bookRepository.getOne(session.getIdBook()).setStatus(BORROWED.getStatus());
+
+                    // set status is approved
+                    session.setStatus(APPROVED.name());
+                }
+                else if (session.getStatus().equals(MORETIMEORDER.name())) {
+                    Date timestamp = session.getDate_borrowed();
+
+                    long days = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+                    timestamp.setTime(timestamp.getTime()+days);
+
+                    session.setExpiration_date(timestamp);
+
+                    // set status is approved
+                    session.setStatus(APPROVED.name());
+                }
+                else {
+                    Book book = bookRepository.getOne(session.getIdBook());
+                    book.setStatus(NORMAL.getStatus());
+
+                    sessionRepository.delete(session);
+                }
+            } else {
+                // if order then delete session
+                if (session.getStatus().equals(ORDER.name())||session.getStatus().equals(GIVEBACK.name()))
+                {
+                    sessionRepository.delete(session);
+                    bookRepository.getOne(session.getIdBook()).setStatus(NORMAL.getStatus());
+                }
+                // if moreTime or give back then set deny
+                else if (session.getStatus().equals(MORETIMEORDER.name()))
+                    session.setStatus(DENY.name());
+            }
         }
-
     }
-
 
     public void delete(long id) {
         if (!isExist(id))

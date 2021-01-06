@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import library.jpa.responceEntity.EntityResponse;
-import library.security.DAO.UsernameAndPasswordDAO;
+import library.security.Dao.UsernameAndPasswordDao;
 import library.security.configuration.jwt_config.JwtPropertiesConfiguration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -37,7 +37,7 @@ public class JwtUsernamePasswordAuthenticationFilter extends UsernamePasswordAut
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
         try {
             // tạo dao để map dữ liệu vào từ request
-            UsernameAndPasswordDAO accountDAO = new ObjectMapper().readValue(request.getInputStream(), UsernameAndPasswordDAO.class);
+            UsernameAndPasswordDao accountDAO = new ObjectMapper().readValue(request.getInputStream(), UsernameAndPasswordDao.class);
 
             Authentication authentication;
 
@@ -91,9 +91,10 @@ public class JwtUsernamePasswordAuthenticationFilter extends UsernamePasswordAut
 
     @Override
     protected void unsuccessfulAuthentication(HttpServletRequest request, HttpServletResponse response, AuthenticationException failed) throws IOException, ServletException {
-
         // return response error
-        response.setContentType("json");
+
+        response.setContentType("json;charset=ISO-8859-1");
+
 
         EntityResponse<Object> entityResponse = new EntityResponse(HttpStatus.NOT_ACCEPTABLE, "username or password is not correct", null);
 

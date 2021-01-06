@@ -1,62 +1,78 @@
 package library.jpa.controller;
 
-import library.jpa.entity.User;
+import library.jpa.Dao.HeadBookDao;
+import library.jpa.Dao.ListDao;
+import library.jpa.entity.HeadBook;
 import library.jpa.responceEntity.EntityResponse;
-import library.jpa.service.UserService;
+import library.jpa.service.CardService;
+import library.jpa.service.HeadBookService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Timestamp;
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 @RestController
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('USER','LIBRARIAN','MANAGER','ADMIN')")
+@RequestMapping(value = "/library/jpa")
 public class UserController {
+    private final CardService cardService;
+    private final HeadBookService headBookService;
+
     @Autowired
-    UserService studentService;
-
-    @PreAuthorize("hasRole('ROLE_USER')")
-    @RequestMapping(value = "/student/showall", method = RequestMethod.GET)
-    public EntityResponse getAll()
-    {
-        EntityResponse entityResponse = new EntityResponse(200,
-                new Timestamp(System.currentTimeMillis()),"successful",studentService.showStudent());
-        return entityResponse;
+    public UserController(CardService cardService, HeadBookService headBookService) {
+        this.cardService = cardService;
+        this.headBookService = headBookService;
     }
 
-    @RequestMapping(value = "/student/id={id}", method = RequestMethod.GET)
-    public EntityResponse getById(@PathVariable Long id) {
-        EntityResponse entityResponse = new EntityResponse(200, new Timestamp(System.currentTimeMillis()),"get ok",
-                studentService.getByID(id));
-        return entityResponse;
+    // *** ok ***
+    @RequestMapping(value = "/card/order", method = RequestMethod.POST)
+    public EntityResponse<Object> oderBook(@RequestBody ListDao borrowBookDAO, HttpServletRequest httpServletRequest) {
+        cardService.orderBooks(borrowBookDAO,httpServletRequest);
+        return new EntityResponse<>(HttpStatus.OK, "You just order book. Wait for approval", borrowBookDAO);
     }
 
-    @RequestMapping(value = "/student/find/name={name}", method = RequestMethod.GET)
-    public EntityResponse<List<User>> findbyname(@PathVariable String name) {
-        return new EntityResponse<>(HttpStatus.OK,"find ok",studentService.findbyname(name));
-    }
-    @RequestMapping(value = "/student/find/phone={phone}", method = RequestMethod.GET)
-    public EntityResponse<List<User>> findbyphone(@PathVariable String phone) {
-        return new EntityResponse<>(HttpStatus.OK,"find by phone",studentService.findbyphone(phone)) ;
+    // *** ok ***
+    @RequestMapping(value = "/card/order/head", method = RequestMethod.POST)
+    public EntityResponse<Object> orderBookByHeadBook(@RequestBody ListDao borrowBookDAO, HttpServletRequest httpServletRequest) {
+        cardService.orderBookByHead(borrowBookDAO,httpServletRequest);
+        return new EntityResponse<>(HttpStatus.OK, "You just order book. Wait for approval", borrowBookDAO);
     }
 
-    @RequestMapping(value = "/student/create", method = RequestMethod.POST)
-    public EntityResponse<User> create(@RequestBody User student){
-        studentService.add(student);
-        return new EntityResponse<>(HttpStatus.OK,"create successful",student);
+    // *** ok ***
+    @RequestMapping(value = "/card/order/moreTime", method = RequestMethod.POST)
+    public EntityResponse<Object> moreTimeExpire(@RequestBody ListDao borrowBookDAO, HttpServletRequest httpServletRequest) {
+        cardService.moreTime(borrowBookDAO,httpServletRequest);
+        return new EntityResponse<>(HttpStatus.OK, "You just order more time to your book. Wait for approval", borrowBookDAO);
     }
 
-    @RequestMapping(value = {"/student/update"}, method = RequestMethod.PUT)//?id=
-    public EntityResponse<User> updatebyid(@RequestBody User student, @RequestParam Long id){
-        return new EntityResponse<>(HttpStatus.OK,"update successful",
-                studentService.updateById(student,id));
+    // *** ok ***
+    @PutMapping(value = {"/card/giveback","/card/order/cancel"})
+    public EntityResponse<Object> giveBookBack(@RequestBody ListDao listDao, HttpServletRequest httpServletRequest) {
+        cardService.payBook(listDao,httpServletRequest);
+        return new EntityResponse<>(HttpStatus.OK, "Book back Successful. follow is list book ID that you just return", listDao);
     }
 
-    @RequestMapping(value = "/student/delete/{id}", method = RequestMethod.DELETE)
-    public EntityResponse<User> delete(@PathVariable Long id) {
-        studentService.delete(id);
-        return new EntityResponse<>(HttpStatus.OK,"delete successful",null);
+    // *** ok ***
+    @GetMapping(value = "/book/head/id={id}")
+    public EntityResponse<HeadBook> findBook(@PathVariable Long id) {
+        HeadBook book = headBookService.getHeadBookById(id);
+        return new EntityResponse<>(HttpStatus.OK, "Information of HeadBook with id '" + id +"'", book);
+    }
+
+    // *** ok ***
+    @GetMapping(value = "/book/head/list")
+    public EntityResponse<List<HeadBook>> getAllBook() {
+        System.out.println("receive request to /book/head/list");
+        List<HeadBook> books = headBookService.getAllHeadBook();
+        return new EntityResponse<List<HeadBook>>(HttpStatus.OK, "Find all headBooks", books);
+    }
+
+    // *** ok ***
+    @GetMapping("/book/head/find")
+    public EntityResponse<List<HeadBook>> findByDao(@RequestBody HeadBookDao headBookDAO) {
+        return new EntityResponse<>(HttpStatus.OK, "find successful", headBookService.findByDao(headBookDAO));
     }
 }

@@ -11,8 +11,8 @@ public class EntityResponse<T> {
     private int status;
     @JsonIgnore
     private Timestamp timestamp;
-    private String message;
-    private String time;
+    public String message;
+    String time;
 
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private T data;

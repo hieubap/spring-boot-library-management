@@ -2,7 +2,6 @@ package library.jpa.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import library.jpa.enum_.StatusSession;
 
 import javax.persistence.*;
 import java.io.Serializable;
