@@ -8,10 +8,11 @@
         <version>2.4.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>library</groupId>
-    <artifactId>project</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>Done</name>
+
+    <groupId>spring-boot-project</groupId>
+    <artifactId>spring-boot-library-management</artifactId>
+    <version>1.0</version>
+    <name>spring-boot-library-management</name>
     <description>Project with Spring security</description>
 
     <properties>
@@ -19,6 +20,12 @@
     </properties>
 
     <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <version>2.4.1</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
